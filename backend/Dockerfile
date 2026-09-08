@@ -7,6 +7,7 @@ RUN npm ci
 
 COPY . .
 RUN npx tsc
+RUN cp src/db/schema.sql dist/db/schema.sql
 
 EXPOSE 3005
 

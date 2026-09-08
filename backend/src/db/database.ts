@@ -12,6 +12,9 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'automotors',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || '',
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 });
 
 pool.on('error', (err) => {
@@ -19,21 +22,32 @@ pool.on('error', (err) => {
 });
 
 async function initDB() {
-  const client = await pool.connect();
-  try {
-    const schemaPath = path.join(__dirname, 'schema.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf-8');
-    await client.query(schema);
-    console.log('Tablas creadas/verificadas');
+  let retries = 10;
+  while (retries > 0) {
+    try {
+      const client = await pool.connect();
+      try {
+        const schemaPath = path.join(__dirname, 'schema.sql');
+        const schema = fs.readFileSync(schemaPath, 'utf-8');
+        await client.query(schema);
+        console.log('Tablas creadas/verificadas');
 
-    const { rows } = await client.query('SELECT COUNT(*) as count FROM users');
-    if (parseInt(rows[0].count) === 0) {
-      console.log('Insertando datos demo...');
-      await seed(client);
-      console.log('Datos demo insertados');
+        const { rows } = await client.query('SELECT COUNT(*) as count FROM users');
+        if (parseInt(rows[0].count) === 0) {
+          console.log('Insertando datos demo...');
+          await seed(client);
+          console.log('Datos demo insertados');
+        }
+        return;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      retries--;
+      console.log(`Esperando PostgreSQL... (${retries} intentos restantes)`);
+      if (retries === 0) throw error;
+      await new Promise(r => setTimeout(r, 3000));
     }
-  } finally {
-    client.release();
   }
 }
 
