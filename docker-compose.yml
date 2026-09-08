@@ -10,6 +10,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-automotors123}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - automotors
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d automotors"]
       interval: 5s
@@ -31,6 +33,8 @@ services:
       DB_NAME: automotors
       DB_USER: postgres
       DB_PASSWORD: ${DB_PASSWORD:-automotors123}
+    networks:
+      - automotors
     depends_on:
       db:
         condition: service_healthy
@@ -48,9 +52,15 @@ services:
     restart: unless-stopped
     ports:
       - "3006:80"
+    networks:
+      - automotors
     depends_on:
       backend:
         condition: service_healthy
+
+networks:
+  automotors:
+    driver: bridge
 
 volumes:
   pgdata:
