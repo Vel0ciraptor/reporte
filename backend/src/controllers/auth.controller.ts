@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db from '../db/demo-db';
+import db from '../db/database';
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -11,7 +11,7 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' });
     }
 
-    const existingUser = db.users.findByEmail(email);
+    const existingUser = await db.users.findByEmail(email);
     if (existingUser) {
       return res.status(400).json({ error: 'El email ya está registrado' });
     }
@@ -19,7 +19,7 @@ export const register = async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const userRole = role === 'admin' ? 'admin' : 'promotor';
 
-    const user = db.users.create({
+    const user = await db.users.create({
       name,
       email,
       password: hashedPassword,
@@ -47,7 +47,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email y contraseña son requeridos' });
     }
 
-    const user = db.users.findByEmail(email);
+    const user = await db.users.findByEmail(email);
     if (!user) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
@@ -75,7 +75,7 @@ export const login = async (req: Request, res: Response) => {
 
 export const getProfile = async (req: any, res: Response) => {
   try {
-    const user = db.users.findById(req.user.id);
+    const user = await db.users.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }

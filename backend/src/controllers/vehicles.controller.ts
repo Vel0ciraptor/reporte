@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import db from '../db/demo-db';
+import db from '../db/database';
 import { AuthRequest } from '../types';
 
 export const createVehicle = async (req: AuthRequest, res: Response) => {
@@ -13,7 +13,7 @@ export const createVehicle = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'El nombre del vehículo es requerido' });
     }
 
-    const vehicle = db.vehicles.create({
+    const vehicle = await db.vehicles.create({
       name,
       description: description || null,
       price: price ? parseFloat(price) : null,
@@ -33,7 +33,7 @@ export const createVehicle = async (req: AuthRequest, res: Response) => {
 export const getAllVehicles = async (req: AuthRequest, res: Response) => {
   try {
     const { status } = req.query;
-    const vehicles = db.vehicles.findAll(status as string);
+    const vehicles = await db.vehicles.findAll(status as string);
     res.json(vehicles);
   } catch (error) {
     console.error('Error al obtener vehículos:', error);
@@ -44,7 +44,7 @@ export const getAllVehicles = async (req: AuthRequest, res: Response) => {
 export const getVehicleById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const vehicle = db.vehicles.findById(parseInt(id));
+    const vehicle = await db.vehicles.findById(parseInt(id));
 
     if (!vehicle) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
@@ -73,7 +73,7 @@ export const updateVehicle = async (req: AuthRequest, res: Response) => {
     if (image_url) updateData.image_url = image_url;
     if (pdf_url) updateData.pdf_url = pdf_url;
 
-    const vehicle = db.vehicles.update(parseInt(id), updateData);
+    const vehicle = await db.vehicles.update(parseInt(id), updateData);
 
     if (!vehicle) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
@@ -89,7 +89,7 @@ export const updateVehicle = async (req: AuthRequest, res: Response) => {
 export const deleteVehicle = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const deleted = db.vehicles.delete(parseInt(id));
+    const deleted = await db.vehicles.delete(parseInt(id));
 
     if (!deleted) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });

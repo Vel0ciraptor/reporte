@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import { initDB } from './db/database';
 import authRoutes from './routes/auth.routes';
 import clientsRoutes from './routes/clients.routes';
 import vehiclesRoutes from './routes/vehicles.routes';
@@ -28,16 +29,23 @@ app.use('/api/vehicles', vehiclesRoutes);
 app.use('/api/users', usersRoutes);
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', mode: 'demo', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-console.log('🚀 Modo DEMO activo - usando base de datos en memoria');
-console.log('📧 Credenciales de prueba:');
-console.log('   Admin:  admin@demo.com / demo123');
-console.log('   Promotor: maria@demo.com / demo123');
+async function start() {
+  try {
+    await initDB();
+    console.log('Base de datos inicializada');
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
+    app.listen(PORT, () => {
+      console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error('Error al iniciar servidor:', error);
+    process.exit(1);
+  }
+}
+
+start();
 
 export default app;

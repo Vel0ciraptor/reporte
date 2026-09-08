@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import db from '../db/demo-db';
+import db from '../db/database';
 import { AuthRequest } from '../types';
 
 export const createClient = async (req: AuthRequest, res: Response) => {
@@ -10,7 +10,7 @@ export const createClient = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Nombre, teléfono y vehículo son requeridos' });
     }
 
-    const client = db.clients.create({
+    const client = await db.clients.create({
       name,
       phone,
       email: email || null,
@@ -30,7 +30,7 @@ export const createClient = async (req: AuthRequest, res: Response) => {
 export const getMyClients = async (req: AuthRequest, res: Response) => {
   try {
     const { status } = req.query;
-    const clients = db.clients.findByPromotor(req.user!.id, status as string);
+    const clients = await db.clients.findByPromotor(req.user!.id, status as string);
     res.json(clients);
   } catch (error) {
     console.error('Error al obtener clientes:', error);
@@ -41,7 +41,7 @@ export const getMyClients = async (req: AuthRequest, res: Response) => {
 export const getAllClients = async (req: AuthRequest, res: Response) => {
   try {
     const { status, promotor_id } = req.query;
-    const clients = db.clients.findAll({
+    const clients = await db.clients.findAll({
       status: status as string,
       promotor_id: promotor_id ? parseInt(promotor_id as string) : undefined,
     });
@@ -62,7 +62,7 @@ export const updateClientStatus = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Estado inválido' });
     }
 
-    const client = db.clients.update(parseInt(id), {
+    const client = await db.clients.update(parseInt(id), {
       status,
       last_contact_at: new Date(),
     });
@@ -83,7 +83,7 @@ export const updateClient = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const { name, phone, email, vehicle, notes } = req.body;
 
-    const client = db.clients.update(parseInt(id), {
+    const client = await db.clients.update(parseInt(id), {
       name, phone, email, vehicle, notes,
     });
 
@@ -101,7 +101,7 @@ export const updateClient = async (req: AuthRequest, res: Response) => {
 export const deleteClient = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const deleted = db.clients.delete(parseInt(id));
+    const deleted = await db.clients.delete(parseInt(id));
 
     if (!deleted) {
       return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -116,10 +116,10 @@ export const deleteClient = async (req: AuthRequest, res: Response) => {
 
 export const getAppointments = async (req: AuthRequest, res: Response) => {
   try {
-    const clients = db.clients.findByPromotor(req.user!.id);
+    const clients = await db.clients.findByPromotor(req.user!.id);
     const appointments = clients
-      .filter(c => c.appointment_date)
-      .sort((a, b) => new Date(a.appointment_date!).getTime() - new Date(b.appointment_date!).getTime());
+      .filter((c: any) => c.appointment_date)
+      .sort((a: any, b: any) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime());
     res.json(appointments);
   } catch (error) {
     console.error('Error al obtener citas:', error);
@@ -129,7 +129,7 @@ export const getAppointments = async (req: AuthRequest, res: Response) => {
 
 export const getAllAppointments = async (req: AuthRequest, res: Response) => {
   try {
-    const allClients = db.clients.findAll();
+    const allClients = await db.clients.findAll();
     const appointments = allClients
       .filter((c: any) => c.appointment_date)
       .sort((a: any, b: any) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime());
@@ -142,7 +142,7 @@ export const getAllAppointments = async (req: AuthRequest, res: Response) => {
 
 export const getClientStats = async (req: AuthRequest, res: Response) => {
   try {
-    const stats = db.clients.getStats();
+    const stats = await db.clients.getStats();
     res.json(stats);
   } catch (error) {
     console.error('Error al obtener estadísticas:', error);

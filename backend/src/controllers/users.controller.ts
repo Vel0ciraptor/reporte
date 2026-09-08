@@ -1,11 +1,11 @@
 import { Response } from 'express';
 import bcrypt from 'bcryptjs';
-import db from '../db/demo-db';
+import db from '../db/database';
 import { AuthRequest } from '../types';
 
 export const getAllPromotores = async (req: AuthRequest, res: Response) => {
   try {
-    const promotores = db.users.findPromotores();
+    const promotores = await db.users.findPromotores();
     res.json(promotores);
   } catch (error) {
     console.error('Error al obtener promotores:', error);
@@ -21,13 +21,13 @@ export const createPromotor = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' });
     }
 
-    const existingUser = db.users.findByEmail(email);
+    const existingUser = await db.users.findByEmail(email);
     if (existingUser) {
       return res.status(400).json({ error: 'El email ya está registrado' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = db.users.create({
+    const user = await db.users.create({
       name,
       email,
       password: hashedPassword,
@@ -43,7 +43,7 @@ export const createPromotor = async (req: AuthRequest, res: Response) => {
 
 export const getVehicleStats = async (req: AuthRequest, res: Response) => {
   try {
-    const allClients = db.clients.findAll();
+    const allClients = await db.clients.findAll();
     const counts: Record<string, number> = {};
     allClients.forEach((c: any) => {
       if (c.vehicle) {
@@ -62,8 +62,8 @@ export const getVehicleStats = async (req: AuthRequest, res: Response) => {
 
 export const getPromotorPerformance = async (req: AuthRequest, res: Response) => {
   try {
-    const promotores = db.users.findPromotores();
-    const allClients = db.clients.findAll();
+    const promotores = await db.users.findPromotores();
+    const allClients = await db.clients.findAll();
 
     const performance = promotores.map((p: any) => {
       const clients = allClients.filter((c: any) => c.promotor_id === p.id);
@@ -94,7 +94,7 @@ export const getPromotorPerformance = async (req: AuthRequest, res: Response) =>
 export const getPromotorClients = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const clients = db.clients.findByPromotor(parseInt(id));
+    const clients = await db.clients.findByPromotor(parseInt(id));
     res.json(clients);
   } catch (error) {
     console.error('Error al obtener clientes del promotor:', error);
