@@ -3,6 +3,14 @@ import api from '../../lib/api';
 import toast from 'react-hot-toast';
 import { User, Phone, Mail, Car, FileText, CheckCircle, Calendar } from 'lucide-react';
 
+function getLocalTimezoneOffset(): string {
+  const offset = -new Date().getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  const hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+  const mins = String(Math.abs(offset) % 60).padStart(2, '0');
+  return `${sign}${hours}:${mins}`;
+}
+
 export default function ClientForm({ onSaved }: { onSaved?: () => void }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -24,7 +32,7 @@ export default function ClientForm({ onSaved }: { onSaved?: () => void }) {
         email,
         vehicle,
         notes,
-        appointment_date: appointmentDate || null,
+        appointment_date: appointmentDate ? appointmentDate + getLocalTimezoneOffset() : null,
       });
       toast.success('Cliente registrado exitosamente');
       if (onSaved) {
