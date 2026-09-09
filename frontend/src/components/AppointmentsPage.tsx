@@ -15,10 +15,28 @@ interface Appointment {
   promotor_name?: string;
 }
 
+function parseRawDate(dateStr: string) {
+  const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute] = match;
+  return { year: parseInt(year), month: parseInt(month), day: parseInt(day), hour, minute };
+}
+
+function formatTime(dateStr: string): string {
+  const p = parseRawDate(dateStr);
+  if (!p) return '';
+  const h = parseInt(p.hour);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${p.minute} ${ampm}`;
+}
+
 function getDaysUntil(dateStr: string) {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr);
+  const p = parseRawDate(dateStr);
+  if (!p) return 0;
+  const target = new Date(p.year, p.month - 1, p.day);
   target.setHours(0, 0, 0, 0);
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -32,12 +50,17 @@ function getRelativeLabel(days: number) {
 }
 
 function getDayOfWeek(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('es-MX', { weekday: 'short' });
+  const p = parseRawDate(dateStr);
+  if (!p) return '';
+  const d = new Date(p.year, p.month - 1, p.day);
+  return d.toLocaleDateString('es-MX', { weekday: 'short' });
 }
 
 function getMonthDay(dateStr: string) {
-  const d = new Date(dateStr);
-  return { day: d.getDate(), month: d.toLocaleDateString('es-MX', { month: 'short' }) };
+  const p = parseRawDate(dateStr);
+  if (!p) return { day: 0, month: '' };
+  const d = new Date(p.year, p.month - 1, p.day);
+  return { day: p.day, month: d.toLocaleDateString('es-MX', { month: 'short' }) };
 }
 
 export default function AppointmentsPage() {
@@ -69,9 +92,10 @@ export default function AppointmentsPage() {
 
   const sendReminder = (appointment: Appointment) => {
     const phone = appointment.phone.replace(/\D/g, '');
-    const date = new Date(appointment.appointment_date);
-    const dateStr = date.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-    const timeStr = date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    const p = parseRawDate(appointment.appointment_date);
+    const dateObj = p ? new Date(p.year, p.month - 1, p.day) : new Date();
+    const dateStr = dateObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+    const timeStr = formatTime(appointment.appointment_date);
 
     const message = encodeURIComponent(
       `Hola ${appointment.name}! Soy tu asesor de Automotors.\n\n` +
@@ -87,22 +111,23 @@ export default function AppointmentsPage() {
 
   const { upcoming, past, todayAppts } = useMemo(() => {
     const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const up: Appointment[] = [];
     const pa: Appointment[] = [];
     const td: Appointment[] = [];
 
     appointments.forEach(a => {
-      const d = new Date(a.appointment_date);
-      d.setHours(0, 0, 0, 0);
-      const diff = d.getTime() - now.setHours(0, 0, 0, 0);
-      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      const p = parseRawDate(a.appointment_date);
+      if (!p) return;
+      const apptKey = `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+      const days = getDaysUntil(a.appointment_date);
 
       if (days < 0) pa.push(a);
       else if (days === 0) td.push(a);
       else up.push(a);
     });
 
-    return { upcoming: up, past: pa.sort((a, b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime()), todayAppts: td };
+    return { upcoming: up, past: pa.sort((a, b) => b.appointment_date.localeCompare(a.appointment_date)), todayAppts: td };
   }, [appointments]);
 
   const nextAppointment = upcoming[0];
@@ -154,7 +179,12 @@ export default function AppointmentsPage() {
               <p className="font-bold text-surface-800 text-xl">{nextAppointment.name}</p>
               <p className="text-gold-400 text-base mt-0.5">{nextAppointment.vehicle}</p>
               <p className="text-primary-500 text-sm font-semibold mt-1">
-                {new Date(nextAppointment.appointment_date).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })} - {new Date(nextAppointment.appointment_date).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                {(() => {
+                  const p = parseRawDate(nextAppointment.appointment_date);
+                  if (!p) return '';
+                  const d = new Date(p.year, p.month - 1, p.day);
+                  return `${d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })} - ${formatTime(nextAppointment.appointment_date)}`;
+                })()}
               </p>
             </div>
             <div className="text-right">
@@ -339,7 +369,7 @@ function AppointmentCard({ appointment, onReminder, isPast }: { appointment: App
   const label = getRelativeLabel(days);
   const { day, month } = getMonthDay(appointment.appointment_date);
   const dow = getDayOfWeek(appointment.appointment_date);
-  const time = new Date(appointment.appointment_date).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  const time = formatTime(appointment.appointment_date);
 
   return (
     <div className={`card-compact flex items-center gap-4 ${isPast ? 'opacity-60' : ''}`}>
@@ -375,8 +405,9 @@ function AppointmentCard({ appointment, onReminder, isPast }: { appointment: App
 
 function getAppointmentsForDay(appointments: Appointment[], dateStr: string): Appointment[] {
   return appointments.filter(a => {
-    const d = new Date(a.appointment_date);
-    const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const p = parseRawDate(a.appointment_date);
+    if (!p) return false;
+    const ds = `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
     return ds === dateStr;
   });
 }
