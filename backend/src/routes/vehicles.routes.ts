@@ -30,7 +30,7 @@ const upload = multer({
         cb(new Error('Solo se permiten archivos de imagen'));
       }
     } else if (file.fieldname === 'pdf') {
-      if (file.mimetype === 'application/pdf') {
+      if (file.mimetype === 'application/pdf' || file.mimetype === 'application/x-pdf') {
         cb(null, true);
       } else {
         cb(new Error('Solo se permiten archivos PDF'));
@@ -40,7 +40,7 @@ const upload = multer({
     }
   },
   limits: {
-    fileSize: 10 * 1024 * 1024,
+    fileSize: 5 * 1024 * 1024,
   },
 });
 
@@ -62,7 +62,7 @@ router.delete('/:id', requireAdmin, deleteVehicle);
 router.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'El archivo excede el tamaño máximo de 10MB' });
+      return res.status(400).json({ error: 'El archivo excede el tamaño máximo de 5MB' });
     }
     return res.status(400).json({ error: `Error de carga: ${err.message}` });
   }
