@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../../lib/api';
 import { formatCurrency } from '../../lib/utils';
-import { Eye, MessageCircle, X, Car } from 'lucide-react';
+import { Eye, MessageCircle, X, Car, Info } from 'lucide-react';
 
 interface Vehicle {
   id: number;
@@ -18,6 +18,7 @@ export default function VehicleCatalog() {
   const [loading, setLoading] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showPDF, setShowPDF] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
@@ -67,7 +68,11 @@ export default function VehicleCatalog() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {vehicles.map((vehicle) => (
-            <div key={vehicle.id} className="card overflow-hidden">
+            <div
+              key={vehicle.id}
+              className="card overflow-hidden cursor-pointer hover:border-primary-500/30 transition-all"
+              onClick={() => { setSelectedVehicle(vehicle); setShowDetail(true); }}
+            >
               {vehicle.image_url && !imageErrors[vehicle.id] ? (
                 <img
                   src={`/uploads/${vehicle.image_url}`}
@@ -92,14 +97,14 @@ export default function VehicleCatalog() {
               <div className="flex gap-2 mt-3">
                 {vehicle.pdf_url && (
                   <button
-                    onClick={() => { setSelectedVehicle(vehicle); setShowPDF(true); }}
+                    onClick={(e) => { e.stopPropagation(); setSelectedVehicle(vehicle); setShowPDF(true); }}
                     className="flex-1 bg-blue-500/10 text-blue-400 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1 hover:bg-blue-500/20 transition-all"
                   >
                     <Eye className="w-3.5 h-3.5" /> Ver Ficha
                   </button>
                 )}
                 <button
-                  onClick={() => sendWhatsApp(vehicle)}
+                  onClick={(e) => { e.stopPropagation(); sendWhatsApp(vehicle); }}
                   className="flex-1 bg-emerald-500/10 text-emerald-400 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1 hover:bg-emerald-500/20 transition-all"
                 >
                   <MessageCircle className="w-3.5 h-3.5" /> Enviar
@@ -107,6 +112,67 @@ export default function VehicleCatalog() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {showDetail && selectedVehicle && (
+        <div className="modal-overlay" onClick={() => setShowDetail(false)}>
+          <div className="bg-surface-100 rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto border border-surface-200/50" onClick={(e) => e.stopPropagation()}>
+            {selectedVehicle.image_url && !imageErrors[selectedVehicle.id] ? (
+              <img
+                src={`/uploads/${selectedVehicle.image_url}`}
+                alt={selectedVehicle.name}
+                className="w-full h-56 object-cover"
+              />
+            ) : (
+              <div className="w-full h-56 bg-gradient-to-br from-surface-200 to-surface-300 flex flex-col items-center justify-center">
+                <Car className="w-16 h-16 text-surface-400 mb-2" />
+                <span className="text-surface-500 font-medium text-sm">{selectedVehicle.name}</span>
+              </div>
+            )}
+
+            <div className="p-5">
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="font-bold text-surface-800 text-xl">{selectedVehicle.name}</h3>
+                <button onClick={() => setShowDetail(false)} className="p-1.5 hover:bg-surface-200 rounded-lg transition-colors text-surface-500">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {selectedVehicle.price && (
+                <p className="text-primary-400 font-bold text-2xl mb-4">
+                  {formatCurrency(selectedVehicle.price)}
+                </p>
+              )}
+
+              {selectedVehicle.description && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="w-4 h-4 text-gold-400" />
+                    <span className="label">Descripcion</span>
+                  </div>
+                  <p className="text-surface-600 text-sm leading-relaxed">{selectedVehicle.description}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-4">
+                {selectedVehicle.pdf_url && (
+                  <button
+                    onClick={() => { setShowDetail(false); setShowPDF(true); }}
+                    className="flex-1 bg-blue-500/10 text-blue-400 py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 hover:bg-blue-500/20 transition-all"
+                  >
+                    <Eye className="w-4 h-4" /> Ver Ficha Tecnica
+                  </button>
+                )}
+                <button
+                  onClick={() => sendWhatsApp(selectedVehicle)}
+                  className="flex-1 btn-whatsapp flex items-center justify-center gap-2 text-sm py-3"
+                >
+                  <MessageCircle className="w-4 h-4" /> Enviar por WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

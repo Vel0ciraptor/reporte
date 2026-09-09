@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { MessageCircle, Clock, Timer, CheckCircle2, AlertCircle } from 'lucide-react';
+import { MessageCircle, Clock, Timer, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Appointment {
@@ -45,6 +45,9 @@ export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'upcoming' | 'past' | 'all'>('upcoming');
+  const [calendarView, setCalendarView] = useState<'month' | 'week' | 'year'>('month');
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -233,6 +236,100 @@ export default function AppointmentsPage() {
           )}
         </div>
       )}
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-surface-800 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-primary-400" />
+            Calendario
+          </h3>
+          <div className="flex gap-1 bg-surface-200/50 p-1 rounded-xl">
+            {(['week', 'month', 'year'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => { setCalendarView(v); setSelectedDay(null); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  calendarView === v ? 'bg-surface-100 text-surface-800 shadow-sm' : 'text-gold-400 hover:text-gold-300'
+                }`}
+              >
+                {v === 'week' ? 'Semana' : v === 'month' ? 'Mes' : 'Año'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <CalendarHeader
+            view={calendarView}
+            date={calendarDate}
+            onPrev={() => {
+              const d = new Date(calendarDate);
+              if (calendarView === 'week') d.setDate(d.getDate() - 7);
+              else if (calendarView === 'month') d.setMonth(d.getMonth() - 1);
+              else d.setFullYear(d.getFullYear() - 1);
+              setCalendarDate(d);
+              setSelectedDay(null);
+            }}
+            onNext={() => {
+              const d = new Date(calendarDate);
+              if (calendarView === 'week') d.setDate(d.getDate() + 7);
+              else if (calendarView === 'month') d.setMonth(d.getMonth() + 1);
+              else d.setFullYear(d.getFullYear() + 1);
+              setCalendarDate(d);
+              setSelectedDay(null);
+            }}
+            onToday={() => { setCalendarDate(new Date()); setSelectedDay(null); }}
+          />
+
+          {calendarView === 'week' && (
+            <WeekView
+              date={calendarDate}
+              appointments={appointments}
+              selectedDay={selectedDay}
+              onSelectDay={setSelectedDay}
+            />
+          )}
+          {calendarView === 'month' && (
+            <MonthView
+              date={calendarDate}
+              appointments={appointments}
+              selectedDay={selectedDay}
+              onSelectDay={setSelectedDay}
+            />
+          )}
+          {calendarView === 'year' && (
+            <YearView
+              date={calendarDate}
+              appointments={appointments}
+              onMonthClick={(m) => {
+                const d = new Date(calendarDate);
+                d.setMonth(m);
+                setCalendarDate(d);
+                setCalendarView('month');
+              }}
+            />
+          )}
+        </div>
+
+        {selectedDay && (
+          <div className="mt-3">
+            <h4 className="text-sm font-bold text-gold-400 uppercase tracking-wider mb-2 px-1">
+              Citas del {new Date(selectedDay + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </h4>
+            <div className="space-y-2">
+              {appointments
+                .filter(a => {
+                  const d = new Date(a.appointment_date);
+                  const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  return ds === selectedDay;
+                })
+                .map(a => (
+                  <AppointmentCard key={a.id} appointment={a} onReminder={sendReminder} isPast={getDaysUntil(a.appointment_date) < 0} />
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -272,6 +369,202 @@ function AppointmentCard({ appointment, onReminder, isPast }: { appointment: App
       >
         <MessageCircle className="w-5 h-5" />
       </button>
+    </div>
+  );
+}
+
+function getAppointmentsForDay(appointments: Appointment[], dateStr: string): Appointment[] {
+  return appointments.filter(a => {
+    const d = new Date(a.appointment_date);
+    const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return ds === dateStr;
+  });
+}
+
+function DateToKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function CalendarHeader({ view, date, onPrev, onNext, onToday }: { view: string; date: Date; onPrev: () => void; onNext: () => void; onToday: () => void }) {
+  let title = '';
+  if (view === 'week') {
+    const start = new Date(date);
+    start.setDate(start.getDate() - start.getDay());
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    title = `${start.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  } else if (view === 'month') {
+    title = date.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+  } else {
+    title = date.getFullYear().toString();
+  }
+
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <button onClick={onPrev} className="p-2 hover:bg-surface-200 rounded-lg transition-colors text-surface-600">
+        <ChevronLeft className="w-5 h-5" />
+      </button>
+      <div className="flex items-center gap-3">
+        <h4 className="font-bold text-surface-800 text-base capitalize">{title}</h4>
+        <button onClick={onToday} className="text-xs font-semibold text-primary-400 hover:text-primary-500 px-2 py-1 rounded-lg hover:bg-primary-500/10 transition-all">
+          Hoy
+        </button>
+      </div>
+      <button onClick={onNext} className="p-2 hover:bg-surface-200 rounded-lg transition-colors text-surface-600">
+        <ChevronRight className="w-5 h-5" />
+      </button>
+    </div>
+  );
+}
+
+function WeekView({ date, appointments, selectedDay, onSelectDay }: { date: Date; appointments: Appointment[]; selectedDay: string | null; onSelectDay: (d: string) => void }) {
+  const start = new Date(date);
+  start.setDate(start.getDate() - start.getDay());
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    days.push(d);
+  }
+
+  const today = DateToKey(new Date());
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {dayNames.map(d => (
+          <div key={d} className="text-center text-xs font-bold text-gold-400 py-1">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {days.map(d => {
+          const key = DateToKey(d);
+          const dayAppts = getAppointmentsForDay(appointments, key);
+          const isToday = key === today;
+          const isSelected = key === selectedDay;
+          const isCurrentMonth = d.getMonth() === date.getMonth();
+
+          return (
+            <button
+              key={key}
+              onClick={() => onSelectDay(key)}
+              className={`relative p-2 rounded-xl text-center transition-all min-h-[60px] ${
+                isSelected ? 'bg-primary-500/15 border border-primary-500/30' :
+                isToday ? 'bg-amber-500/10 border border-amber-500/20' :
+                'hover:bg-surface-200 border border-transparent'
+              } ${!isCurrentMonth ? 'opacity-40' : ''}`}
+            >
+              <span className={`text-sm font-bold ${isToday ? 'text-amber-500' : isSelected ? 'text-primary-400' : 'text-surface-700'}`}>
+                {d.getDate()}
+              </span>
+              {dayAppts.length > 0 && (
+                <div className="mt-1">
+                  <span className="inline-block bg-primary-500 text-white text-[10px] font-bold rounded-full w-5 h-5 leading-5">
+                    {dayAppts.length}
+                  </span>
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MonthView({ date, appointments, selectedDay, onSelectDay }: { date: Date; appointments: Appointment[]; selectedDay: string | null; onSelectDay: (d: string) => void }) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startPad = firstDay.getDay();
+  const totalDays = lastDay.getDate();
+
+  const today = DateToKey(new Date());
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < startPad; i++) cells.push(null);
+  for (let d = 1; d <= totalDays; d++) cells.push(new Date(year, month, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {dayNames.map(d => (
+          <div key={d} className="text-center text-xs font-bold text-gold-400 py-1">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, i) => {
+          if (!d) return <div key={`pad-${i}`} />;
+          const key = DateToKey(d);
+          const dayAppts = getAppointmentsForDay(appointments, key);
+          const isToday = key === today;
+          const isSelected = key === selectedDay;
+
+          return (
+            <button
+              key={key}
+              onClick={() => onSelectDay(key)}
+              className={`relative p-1.5 rounded-xl text-center transition-all min-h-[52px] ${
+                isSelected ? 'bg-primary-500/15 border border-primary-500/30' :
+                isToday ? 'bg-amber-500/10 border border-amber-500/20' :
+                'hover:bg-surface-200 border border-transparent'
+              }`}
+            >
+              <span className={`text-xs font-bold ${isToday ? 'text-amber-500' : isSelected ? 'text-primary-400' : 'text-surface-700'}`}>
+                {d.getDate()}
+              </span>
+              {dayAppts.length > 0 && (
+                <div className="mt-0.5">
+                  <span className="inline-block bg-primary-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-[18px] leading-[18px]">
+                    {dayAppts.length}
+                  </span>
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function YearView({ date, appointments, onMonthClick }: { date: Date; appointments: Appointment[]; onMonthClick: (month: number) => void }) {
+  const year = date.getFullYear();
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const now = new Date();
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {monthNames.map((name, m) => {
+        const monthAppts = appointments.filter(a => {
+          const d = new Date(a.appointment_date);
+          return d.getFullYear() === year && d.getMonth() === m;
+        });
+        const isCurrentMonth = now.getFullYear() === year && now.getMonth() === m;
+
+        return (
+          <button
+            key={m}
+            onClick={() => onMonthClick(m)}
+            className={`p-4 rounded-xl text-center transition-all ${
+              isCurrentMonth ? 'bg-primary-500/10 border border-primary-500/20' : 'bg-surface-200/50 hover:bg-surface-200 border border-transparent'
+            }`}
+          >
+            <span className={`text-sm font-bold ${isCurrentMonth ? 'text-primary-400' : 'text-surface-700'}`}>{name}</span>
+            {monthAppts.length > 0 && (
+              <div className="mt-2">
+                <span className="inline-block bg-primary-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                  {monthAppts.length}
+                </span>
+              </div>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
