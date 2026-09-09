@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import {
@@ -35,6 +35,8 @@ const upload = multer({
       } else {
         cb(new Error('Solo se permiten archivos PDF'));
       }
+    } else {
+      cb(null, false);
     }
   },
   limits: {
@@ -42,20 +44,32 @@ const upload = multer({
   },
 });
 
+const uploadMiddleware = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'pdf', maxCount: 1 },
+]);
+
 const router = Router();
 
 router.use(authenticate);
 
 router.get('/', getAllVehicles);
 router.get('/:id', getVehicleById);
-router.post('/', requireAdmin, upload.fields([
-  { name: 'image', maxCount: 1 },
-  { name: 'pdf', maxCount: 1 },
-]), createVehicle);
-router.put('/:id', requireAdmin, upload.fields([
-  { name: 'image', maxCount: 1 },
-  { name: 'pdf', maxCount: 1 },
-]), updateVehicle);
+router.post('/', requireAdmin, uploadMiddleware, createVehicle);
+router.put('/:id', requireAdmin, uploadMiddleware, updateVehicle);
 router.delete('/:id', requireAdmin, deleteVehicle);
+
+router.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'El archivo excede el tamaño máximo de 10MB' });
+    }
+    return res.status(400).json({ error: `Error de carga: ${err.message}` });
+  }
+  if (err.message) {
+    return res.status(400).json({ error: err.message });
+  }
+  next(err);
+});
 
 export default router;

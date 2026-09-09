@@ -1,16 +1,22 @@
 import { Response } from 'express';
 import db from '../db/database';
 import { AuthRequest } from '../types';
+import { convertToWebp, deleteFile } from '../utils/image';
 
 export const createVehicle = async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, price } = req.body;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-    const image_url = files?.['image']?.[0]?.filename || null;
+
+    let image_url = files?.['image']?.[0]?.filename || null;
     const pdf_url = files?.['pdf']?.[0]?.filename || null;
 
     if (!name) {
       return res.status(400).json({ error: 'El nombre del vehículo es requerido' });
+    }
+
+    if (image_url) {
+      image_url = await convertToWebp(image_url);
     }
 
     const vehicle = await db.vehicles.create({
@@ -62,23 +68,34 @@ export const updateVehicle = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const { name, description, price, status } = req.body;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-    const image_url = files?.['image']?.[0]?.filename;
-    const pdf_url = files?.['pdf']?.[0]?.filename;
+
+    let newImageFilename = files?.['image']?.[0]?.filename;
+    let newPdfFilename = files?.['pdf']?.[0]?.filename;
+
+    if (newImageFilename) {
+      newImageFilename = await convertToWebp(newImageFilename);
+    }
+
+    const existing = await db.vehicles.findById(parseInt(id));
+    if (!existing) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
 
     const updateData: any = {};
     if (name) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (price !== undefined) updateData.price = price ? parseFloat(price) : null;
     if (status) updateData.status = status;
-    if (image_url) updateData.image_url = image_url;
-    if (pdf_url) updateData.pdf_url = pdf_url;
-
-    const vehicle = await db.vehicles.update(parseInt(id), updateData);
-
-    if (!vehicle) {
-      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    if (newImageFilename) {
+      deleteFile(existing.image_url);
+      updateData.image_url = newImageFilename;
+    }
+    if (newPdfFilename) {
+      deleteFile(existing.pdf_url);
+      updateData.pdf_url = newPdfFilename;
     }
 
+    const vehicle = await db.vehicles.update(parseInt(id), updateData);
     res.json(vehicle);
   } catch (error) {
     console.error('Error al actualizar vehículo:', error);
@@ -89,12 +106,16 @@ export const updateVehicle = async (req: AuthRequest, res: Response) => {
 export const deleteVehicle = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const deleted = await db.vehicles.delete(parseInt(id));
+    const vehicle = await db.vehicles.findById(parseInt(id));
 
-    if (!deleted) {
+    if (!vehicle) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
 
+    deleteFile(vehicle.image_url);
+    deleteFile(vehicle.pdf_url);
+
+    await db.vehicles.delete(parseInt(id));
     res.json({ message: 'Vehículo eliminado' });
   } catch (error) {
     console.error('Error al eliminar vehículo:', error);
